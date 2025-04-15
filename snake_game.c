@@ -2,10 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 #define ROWS 10
 #define COLUMNS 25
-
 
 
 void game_over() {
@@ -14,7 +14,7 @@ void game_over() {
         _getch();
     }
 
-    printf("GAME OVER!\nPress Enter to exit...");
+    printf("\nGAME OVER!\nPress Enter to exit...");
 
     while (1) {
         if (_kbhit()) {
@@ -36,7 +36,7 @@ void create_area(char area[ROWS][COLUMNS]) {
             }
             else if (i == 0 && (COLUMNS - 1 > j > 0) || (i == ROWS - 1 && COLUMNS - 1 > j > 0) || (
                            j == 0 && ROWS - 1 > i > 0) || (j == COLUMNS - 1 && ROWS - 1 > i > 0)) {
-                area[i][j] = '*';
+                area[i][j] = '-';
             } else {
                 area[i][j] = ' ';
             }
@@ -53,58 +53,104 @@ void draw_grid(char area[ROWS][COLUMNS]) {
     }
 }
 
-void update_area(char area[ROWS][COLUMNS],int snake_head_pos[2]) {
-    //srand(time(NULL));
+void spawn_food(char area[ROWS][COLUMNS], int snake_head_pos[2]) {
+    srand(time(NULL));
+    int rand_row = 0;
+    int rand_col = 0;
+    while (1) {
+        rand_row = rand()%(ROWS-1) + 1;
+        rand_col = rand()%(COLUMNS-1) + 1;
+        // checking for it not to be on the position of the snake head
+        if (area[rand_row][rand_col] == ' ') {
+            break;
+        }
+    }
+    area[rand_row][rand_col] = '*';
+}
+
+
+void init_game(char area[ROWS][COLUMNS],int snake_head_pos[2],int *score, int snake_body[100][2], int *length) {
     int prev_row = snake_head_pos[0];
     int prev_col = snake_head_pos[1];
-    char direction_set;
+    static char direction_set = 'w';
+
     draw_grid(area);
+    printf("GAME SCORE: %d", *score);
+    usleep(200000);
+
+    for (int i = *length; i>0;i--) {
+        snake_body[i][0] = snake_body[i-1][0];
+        snake_body[i][1] = snake_body[i-1][1];
+    }
+
+    if (1) {
+        snake_body[0][0] = prev_row;
+        snake_body[0][1] = prev_col;
+    }
 
     if (kbhit()) {
         char act = getch();
-        if (act == 'w') {
-            if (snake_head_pos[0] != 1) {
-                snake_head_pos[0]--;
-                direction_set = 'w';
-            }
-            else {
-                game_over();
-            }
+        if ((act   == 'w' && direction_set!='s') || (act == 'a' && direction_set != 'd')||
+            (act == 's' && direction_set != 's') ||(act=='d'&&direction_set!='a') ){
+            direction_set = act;
         }
+    }
+    if (area[snake_head_pos[0]][snake_head_pos[1]] == 'o') {
+        game_over();
+    }
 
-        else if (act == 'a') {
-            if (snake_head_pos[1] != 1) {
-                snake_head_pos[1]--;
-                direction_set = 'a';
-            }
-            else {
-                game_over();
-            }
+    if (direction_set == 'w') {
+        if (snake_head_pos[0] != 1) {
+            snake_head_pos[0]--;
         }
-
-        else if (act == 's') {
-            if (snake_head_pos[0] != ROWS-2) {
-                snake_head_pos[0]++;
-                direction_set = 's';
-            }
-            else {
-                game_over();
-            }
+        else {
+            game_over();
         }
-
-        else if (act == 'd' && snake_head_pos[1] != COLUMNS-2) {
+    }
+    else if (direction_set == 'a') {
+        if (snake_head_pos[1] != 1) {
+            snake_head_pos[1]--;
+        }
+        else {
+            game_over();
+        }
+    }
+    else if (direction_set == 's') {
+        if (snake_head_pos[0] != ROWS-2) {
+            snake_head_pos[0]++;
+        }
+        else {
+            game_over();
+        }
+    }
+    else if (direction_set == 'd') {
+        if (snake_head_pos[1] != COLUMNS -2) {
             snake_head_pos[1]++;
-            direction_set = 'd';
         }
-        else if (act == 'd' && snake_head_pos[1] == COLUMNS-2) {
+        else {
             game_over();
         }
     }
 
+    if (area[snake_head_pos[0]][snake_head_pos[1]] == '*') {
+        (*score)++;
+        (*length)++;
+        spawn_food(area, snake_head_pos);
+    }
+    //clearing old snake parts
+    for (int i=0;i<ROWS;i++) {
+        for (int j=0;j<COLUMNS;j++) {
+            if (area[i][j] == 'O' || area[i][j] == 'o') {
+                area[i][j] = ' ';
+            }
+        }
+    }
 
-
-    area[prev_row][prev_col] = ' ';
     area[snake_head_pos[0]][snake_head_pos[1]] = 'O';
+
+    for (int i=0;i< *length;i++) {
+        area[snake_body[i][0]][snake_body[i][1]] = 'o';
+    }
 
 
     //to optimize ram
@@ -118,9 +164,13 @@ int main() {
     int snake_head_col = COLUMNS/2;
     int snake_head_pos[2] = {snake_head_row,snake_head_col};
     char area[ROWS][COLUMNS];
-    create_area(area);
+    int snake_body[100][2]; //100 body segments each with row and column
+    int length = 0;
+    int score = 0;
 
+    create_area(area);
+    spawn_food(area,snake_head_pos);
     while (1) {
-        update_area(area,snake_head_pos);
+        init_game(area,snake_head_pos, &score, snake_body, &length);
         }
     }
